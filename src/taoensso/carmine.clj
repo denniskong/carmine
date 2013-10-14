@@ -304,7 +304,8 @@
   "Alpha - subject to change.
   Tool to ease Redis transactions for fun & profit. Wraps body in a `wcar`
   call that terminates with `exec`, cleans up reply, and supports automatic
-  retry for failed optimistic locking. Parsers NOT supported.
+  retry for failed optimistic locking. `return` and `pass` NOT supported in
+  body.
 
   ;;; Atomically increment integer key without using INCR
   (atomic {} 100 ; Retry <= 100 times on failed optimistic lock, or throw ex
@@ -322,6 +323,9 @@
   Body must contain a `multi` call and may contain calls to: `watch`, `unwatch`,
   `discard`, etc. Ref. http://redis.io/topics/transactions for more info.
 
+  Like `swap!` fn, body may be called multiple times so should avoid impure or
+  expensive ops.
+
   See also `lua` as an alternative method of achieving transactional behaviour."
   [conn max-cas-attempts & body]
   (assert (>= max-cas-attempts 1))
@@ -337,7 +341,7 @@
                     (throw e#)))
              (let [exec-result# (with-replies (exec))]
                (if (not= exec-result# []) ; => empty `mutli` or watched key changed
-                 (remember exec-result#)
+                 (return exec-result#)
                  (if (= idx# max-idx#)
                    (throw (Exception. (format "`atomic` failed after %s attempt(s)"
                                               idx#)))
